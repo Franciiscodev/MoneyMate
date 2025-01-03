@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conversor de Moedas</title>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Nunito', sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #eef2f5;
+        }
+        #container {
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+            margin-top: 20px;
+            position: relative;
+        }
+        h1 {
+            color: #007bff;
+            margin-bottom: 20px;
+        }
+        .currency-selector {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 20px 0;
+        }
+        .currency-selector button {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            border: 1px solid #ddd;
+            background-color: #fff;
+            border-radius: 5px;
+            cursor: pointer;
+            position: relative;
+            width: 140px;
+            justify-content: space-between;
+        }
+        .currency-selector img {
+            margin-right: 10px;
+        }
+        .swap-icon {
+            cursor: pointer;
+            margin: 0 10px;
+        }
+        .input-group {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 10px 0;
+        }
+        .input-group input {
+            font-size: 16px;
+            padding: 8px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            width: 100%;
+            margin-right: 5px;
+            outline: none;
+        }
+        .rate-info {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #555;
+        }
+        .widget {
+            background-color: #ffffff;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .dropdown-menu {
+            position: absolute;
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            width: 140px;
+            top: 60px;
+            display: none;
+            flex-direction: column;
+            z-index: 100;
+        }
+        .dropdown-menu button {
+            padding: 10px;
+            border: none;
+            background: none;
+            text-align: left;
+            width: 100%;
+            cursor: pointer;
+        }
+        .dropdown-menu button:hover {
+            background-color: #f0f0f0;
+        }
+    </style>
+</head>
+<body>
+    <div class="widget" id="exchange-widget">
+        <div id="preco-usd">USD/BRL: Carregando...</div>
+        <div id="preco-eur">EUR/BRL: Carregando...</div>
+    </div>
+
+    <div id="container">
+        <h1>Conversor de Moedas</h1>
+        <div class="currency-selector">
+            <div style="position: relative;">
+                <button id="currency-from" onclick="toggleDropdown('from')">
+                    <img id="flag-from" src="flags/usd.svg" alt="USD" width="24" height="24">
+                    <span id="code-from">USD</span>
+                    <span class="tw-icon-chevron-down">▼</span>
+                </button>
+                <div class="dropdown-menu" id="dropdown-from">
+                    <button onclick="selectCurrency('USD', 'from')">USD</button>
+                    <button onclick="selectCurrency('EUR', 'from')">EUR</button>
+                    <button onclick="selectCurrency('BRL', 'from')">BRL</button>
+                </div>
+            </div>
+            <span class="swap-icon" onclick="swapCurrencies()">⇄</span>
+            <div style="position: relative;">
+                <button id="currency-to" onclick="toggleDropdown('to')">
+                    <img id="flag-to" src="flags/brl.svg" alt="BRL" width="24" height="24">
+                    <span id="code-to">BRL</span>
+                    <span class="tw-icon-chevron-down">▼</span>
+                </button>
+                <div class="dropdown-menu" id="dropdown-to">
+                    <button onclick="selectCurrency('USD', 'to')">USD</button>
+                    <button onclick="selectCurrency('EUR', 'to')">EUR</button>
+                    <button onclick="selectCurrency('BRL', 'to')">BRL</button>
+                </div>
+            </div>
+        </div>
+        <div class="input-group">
+            <input id="valor" type="number" placeholder="Valor">
+            <input id="resultado" type="text" placeholder="Resultado" readonly>
+        </div>
+        <div class="rate-info" id="rate-info">
+            1 USD = ... BRL
+        </div>
+    </div>
+
+    <script>
+        let cotacaoUSD = 0;
+        let cotacaoEUR = 0;
+
+        const flags = {
+            "USD": "flags/usd.svg",
+            "EUR": "flags/eur.svg",
+            "BRL": "flags/brl.svg"
+        };
+
+        document.addEventListener("DOMContentLoaded", function () {
+            atualizarCotacoes();
+            setInterval(atualizarCotacoes, 300000);
+
+            document.getElementById('valor').addEventListener('input', () => convert());
+            document.addEventListener('click', function(event) {
+                if (!event.target.closest('.currency-selector')) {
+                    closeDropdowns();
+                }
+            });
+        });
+
+        function atualizarCotacoes() {
+            fetch('https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL')
+                .then(response => response.json())
+                .then(data => {
+                    cotacaoUSD = parseFloat(data.USDBRL.bid);
+                    cotacaoEUR = parseFloat(data.EURBRL.bid);
+                    document.getElementById('preco-usd').textContent = `USD/BRL: R$ ${cotacaoUSD.toFixed(2)}`;
+                    document.getElementById('preco-eur').textContent = `EUR/BRL: R$ ${cotacaoEUR.toFixed(2)}`;
+                    updateRateInfo();
+                })
+                .catch(error => console.error('Erro ao buscar as cotações:', error));
+        }
+
+        function swapCurrencies() {
+            const codeFrom = document.getElementById('code-from');
+            const codeTo = document.getElementById('code-to');
+            const flagFrom = document.getElementById('flag-from');
+            const flagTo = document.getElementById('flag-to');
+
+            [codeFrom.textContent, codeTo.textContent] = [codeTo.textContent, codeFrom.textContent];
+            [flagFrom.src, flagTo.src] = [flagTo.src, flagFrom.src];
+            convert();
+        }
+
+        function toggleDropdown(position) {
+            const dropdown = document.getElementById(`dropdown-${position}`);
+            const isVisible = dropdown.style.display === 'flex';
+            closeDropdowns();
+            dropdown.style.display = isVisible ? 'none' : 'flex';
+        }
+
+        function closeDropdowns() {
+            document.querySelectorAll('.dropdown-menu').forEach(menu => {
+                menu.style.display = 'none';
+            });
+        }
+
+        function selectCurrency(currency, position) {
+            const codeElement = document.getElementById(`code-${position}`);
+            const flagElement = document.getElementById(`flag-${position}`);
+            codeElement.textContent = currency;
+            flagElement.src = flags[currency];
+            convert();
+        }
+
+        function convert() {
+            const valor = parseFloat(document.getElementById('valor').value) || 0;
+            const codeFrom = document.getElementById('code-from').textContent;
+            const codeTo = document.getElementById('code-to').textContent;
+            let rate = 1;
+
+            if (codeFrom === 'USD' && codeTo === 'BRL') {
+                rate = cotacaoUSD;
+            } else if (codeFrom === 'EUR' && codeTo === 'BRL') {
+                rate = cotacaoEUR;
+            } else if (codeFrom === 'BRL' && codeTo === 'USD') {
+                rate = 1 / cotacaoUSD;
+            } else if (codeFrom === 'BRL' && codeTo === 'EUR') {
+                rate = 1 / cotacaoEUR;
+            } else if (codeFrom === 'USD' && codeTo === 'EUR') {
+                rate = cotacaoUSD / cotacaoEUR;
+            } else if (codeFrom === 'EUR' && codeTo === 'USD') {
+                rate = cotacaoEUR / cotacaoUSD;
+            }
+
+            document.getElementById('resultado').value = (valor * rate).toFixed(2);
+            updateRateInfo();
+        }
+
+        function updateRateInfo() {
+            const codeFrom = document.getElementById('code-from').textContent;
+            const codeTo = document.getElementById('code-to').textContent;
+            let rate = 1;
+
+            if (codeFrom === 'USD' && codeTo === 'BRL') {
+                rate = cotacaoUSD;
+            } else if (codeFrom === 'EUR' && codeTo === 'BRL') {
+                rate = cotacaoEUR;
+            } else if (codeFrom === 'BRL' && codeTo === 'USD') {
+                rate = 1 / cotacaoUSD;
+            } else if (codeFrom === 'BRL' && codeTo === 'EUR') {
+                rate = 1 / cotacaoEUR;
+            } else if (codeFrom === 'USD' && codeTo === 'EUR') {
+                rate = cotacaoUSD / cotacaoEUR;
+            } else if (codeFrom === 'EUR' && codeTo === 'USD') {
+                rate = cotacaoEUR / cotacaoUSD;
+            }
+
+            document.getElementById('rate-info').textContent = `1 ${codeFrom} = ${rate.toFixed(5)} ${codeTo}`;
+        }
+    </script>
+</body>
+</html>
